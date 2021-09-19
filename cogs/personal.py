@@ -5,7 +5,7 @@ import operator
 from typing import List, Union
 
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 from data.models import NebuBot, ChannelHistoryRead, UserCount
 import utils.image_manipulation as im
@@ -17,16 +17,17 @@ class PersonalCog(commands.Cog, name="Personal"):
         self.channel_reader = {}
         self.user_counter = {}
         self.CHANNEL_LIMIT = 1000
-        bot.loop.create_task(self.reader_channels())
+        if not bot.tester:
+            self.reader_channels.start()
 
+    @tasks.loop(seconds=10)
     async def reader_channels(self):
+        print("count session:", self.reader_channels.count)
+        await self.reading_session()
+
+    @reader_channels.before_loop
+    async def before_reading(self):
         await self.bot.wait_until_ready()
-        counter = 0
-        while True:
-            print("count session:", counter)
-            await self.reading_session()
-            counter += 1
-            await asyncio.sleep(10)
 
     async def gather_readable_channel(self):
         for channel in self.bot.get_all_channels():
@@ -99,10 +100,10 @@ class PersonalCog(commands.Cog, name="Personal"):
         await user_count.update_channel(message.channel.id)
 
     @commands.command()
-    async def total_messages(self, ctx, channel: discord.TextChannel = None):
+    async def totalmessages(self, ctx, channel: discord.TextChannel = None):
         channel = channel or ctx.channel
         user = await self.acquire_user(ctx.author.id)
-        await ctx.send(f"Ur total messages in this channel so far is {user.channel_ids[channel.id]}")
+        await ctx.send(f"Total messages in this channel for you is {user.channel_ids[channel.id]}")
 
     @commands.command()
     async def mostactive(self, ctx, user: Union[discord.Member, discord.User] = None):
@@ -131,7 +132,7 @@ class PersonalCog(commands.Cog, name="Personal"):
 
             bar = await im.create_bar(channel_names, channel_counters, str(color))
             to_send = await im.process_image(avatar_bytes, bar)
-            file = discord.File(to_send, filename=ctx.author.display_name + ".png")
+            file = discord.File(to_send, filename="top_message.png")
 
         embed = discord.Embed(title=f"Top {len(counters)} channels that is active for {user}.", color=color)
         embed.set_image(url="attachment://" + file.filename)

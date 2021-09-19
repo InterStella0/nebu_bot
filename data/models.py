@@ -20,7 +20,16 @@ class NebuBot(commands.Bot):
         self.db_pass = settings.pop("db_pass")
         self.db_dbname = settings.pop("db_dbname")
         self.color = settings.pop("color")
+        self.tester = settings.get("tester", False)
         self.pool_pg = None
+
+    async def resolve_user(self, user_id: int, *, guild_id: Optional[int] = None):
+        if not guild_id:
+            user = self.get_guild(guild_id).get_member(user_id)
+            if user:
+                return user
+
+        return self.get_user(user_id) or await self.fetch_user(user_id)
 
     @staticmethod
     def get_config():
@@ -38,7 +47,7 @@ class NebuBot(commands.Bot):
                     print("Loaded", formed_name)
                 except Exception as e:
                     trace = traceback.format_exception(type(e), e, e.__traceback__)
-                    print(f"Failure loading", formed_name, ":", trace)
+                    print(f"Failure loading", formed_name, ":", "".join(trace))
 
     async def connect_db(self):
         self.pool_pg = await asyncpg.create_pool(

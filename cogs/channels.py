@@ -20,7 +20,7 @@ class ChannelsCog(commands.Cog, name="Channel"):
         SELECT * FROM user_message
         WHERE channel_id=$1
         ORDER BY counter DESC
-        LIMIT 9"""
+        LIMIT 10"""
 
         data = await self.bot.pool_pg.fetch(query, channel.id)
         async with ctx.typing():
@@ -33,11 +33,10 @@ class ChannelsCog(commands.Cog, name="Channel"):
             counters = []
             for record in reversed(data):
                 user_id = record["user_id"]
-                with contextlib.suppress(discord.NotFound):
+                try:
                     user = await self.bot.resolve_user(user_id, guild_id=ctx.guild.id)
-
-                if not user:
-                    user = user_id
+                except discord.NotFound:
+                    user = user_id or "Unknown User"
                 user_names.append(str(user))
                 counters.append(record["counter"])
 

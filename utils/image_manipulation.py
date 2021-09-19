@@ -4,6 +4,7 @@ import math
 from typing import Coroutine, Any, List, Optional
 
 import discord
+import matplotlib
 from PIL import Image, ImageEnhance, ImageFilter
 import matplotlib.dates as mdates
 import matplotlib.colors as mcolors
@@ -16,6 +17,9 @@ import numpy as np
 from matplotlib.patches import Polygon
 from scipy.interpolate import make_interp_spline
 from jishaku.functools import executor_function
+
+
+matplotlib.use('Agg')
 
 
 def create_gradient_array(color: str, *, alpha_min: Optional[int] = 0, alpha_max: Optional[int] = 1) -> np.array:

@@ -20,7 +20,7 @@ class ChannelsCog(commands.Cog, name="Channel"):
         SELECT * FROM user_message
         WHERE channel_id=$1
         ORDER BY counter DESC
-        LIMIT 10"""
+        LIMIT 9"""
 
         data = await self.bot.pool_pg.fetch(query, channel.id)
         async with ctx.typing():

@@ -1,3 +1,4 @@
+import contextlib
 import io
 
 import discord
@@ -32,7 +33,11 @@ class ChannelsCog(commands.Cog, name="Channel"):
             counters = []
             for record in reversed(data):
                 user_id = record["user_id"]
-                user = await self.bot.resolve_user(user_id, guild_id=ctx.guild.id)
+                with contextlib.suppress(discord.NotFound):
+                    user = await self.bot.resolve_user(user_id, guild_id=ctx.guild.id)
+
+                if not user:
+                    user = user_id
                 user_names.append(str(user))
                 counters.append(record["counter"])
 

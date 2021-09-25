@@ -50,7 +50,9 @@ class PersonalCog(commands.Cog, name="Personal"):
             await user_count.update_channel(channel_id, counter=counted)
 
     async def reading_session(self):
+        channel_read = 0
         async for channel, read_channel in self.gather_readable_channel():
+            channel_read += 1
             print("Reading", channel)
             messages = await channel.history(limit=self.CHANNEL_LIMIT, before=read_channel.furthest_read).flatten()
             await self.save_read(channel.id, messages)
@@ -65,6 +67,10 @@ class PersonalCog(commands.Cog, name="Personal"):
                 query = "UPDATE channel_count SET fully_read=$1 WHERE channel_id=$2 RETURNING *"
                 await self.bot.pool_pg.fetch(query, final_message, channel.id)
             read_channel.fully_read = final_message
+
+        print("I've read", channel_read, "channels")
+        if not channel_read:
+            await asyncio.sleep(10 * 60)
 
     async def acquire_channel(self, channel_id: int) -> ChannelHistoryRead:
         if channel := self.channel_reader.get(channel_id):

@@ -49,5 +49,5 @@ class ChannelsCog(commands.Cog, name="Channel"):
         await ctx.send(embed=embed, file=file)
 
 
-def setup(bot):
-    bot.add_cog(ChannelsCog(bot))
+async def setup(bot):
+    await bot.add_cog(ChannelsCog(bot))

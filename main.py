@@ -1,11 +1,13 @@
 import asyncio
 import logging
 
+import discord
+
 from data.models import NebuBot
 
 logging.basicConfig(level=logging.INFO)
-
-bot = NebuBot("!uwu ")
+intents = discord.Intents.all()
+bot = NebuBot("!uwu ", intents=intents)
 
 
 @bot.ipc_client.listen()

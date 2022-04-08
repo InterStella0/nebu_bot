@@ -45,14 +45,14 @@ class NebuBot(commands.Bot):
         with open("data/config.json") as r:
             return json.load(r)
 
-    def load_extensions(self):
+    async def load_extensions(self):
         root = "cogs"
-        self.load_extension("jishaku")
+        await self.load_extension("jishaku")
         for file in os.listdir(root):
             if file.endswith(".py"):
                 formed_name = f"{root}.{file[:-3]}"
                 try:
-                    self.load_extension(formed_name)
+                    await self.load_extension(formed_name)
                     print("Loaded", formed_name)
                 except Exception as e:
                     trace = traceback.format_exception(type(e), e, e.__traceback__)
@@ -65,9 +65,8 @@ class NebuBot(commands.Bot):
             database=self.db_dbname
         )
 
-    async def run_setup(self):
-        await self.connect_db()
-        self.load_extensions()
+    async def setup_hook(self):
+        await self.load_extensions()
         self.loop.create_task(self.after_ready())
 
     async def on_ready(self):
@@ -92,10 +91,18 @@ class NebuBot(commands.Bot):
                     await message.edit(content=f"Restart lasted {time_taken}")
             print("Server connected.")
 
+    async def _starter(self):
+        try:
+            await self.connect_db()
+        except Exception as e:
+            traceback.print_exc()
+        else:
+            async with self.pool_pg, self:
+                print("Started to run bot")
+                await self.start(self.http.token)
+
     def starter(self):
-        self.loop.run_until_complete(self.run_setup())
-        print("Started to run bot")
-        self.run(self.http.token)
+        asyncio.run(self._starter())
 
 
 @dataclasses.dataclass

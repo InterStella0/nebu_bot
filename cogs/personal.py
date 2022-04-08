@@ -54,7 +54,8 @@ class PersonalCog(commands.Cog, name="Personal"):
         async for channel, read_channel in self.gather_readable_channel():
             channel_read += 1
             print("Reading", channel)
-            messages = await channel.history(limit=self.CHANNEL_LIMIT, before=read_channel.furthest_read).flatten()
+            iterator = channel.history(limit=self.CHANNEL_LIMIT, before=read_channel.furthest_read)
+            messages = [message async for message in iterator]
             await self.save_read(channel.id, messages)
             size = len(messages)
             final_message = size < self.CHANNEL_LIMIT
@@ -145,6 +146,6 @@ class PersonalCog(commands.Cog, name="Personal"):
         await ctx.send(embed=embed, file=file)
 
 
-def setup(bot: NebuBot):
-    bot.add_cog(PersonalCog(bot))
+async def setup(bot: NebuBot):
+    await bot.add_cog(PersonalCog(bot))
 

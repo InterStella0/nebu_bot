@@ -8,6 +8,7 @@ from data.models import NebuBot
 logging.basicConfig(level=logging.INFO)
 intents = discord.Intents.all()
 bot = NebuBot("!uwu ", intents=intents)
+bot.uptime = discord.utils.utcnow()
 
 
 @bot.ipc_client.listen()

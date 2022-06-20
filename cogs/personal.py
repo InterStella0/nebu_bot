@@ -55,8 +55,10 @@ class MessageView(ListPageSource):
             url = f'https://discord.com/channels/{menu.ctx.guild.id}/{item["channel_id"]}/{item["message_id"]}'
             r.append(Value(self.format_content(content), url))
 
-        description = "\n".join(f"{i}. [{item.content}]({item.url})" for i, item in enumerate(r))
-        return discord.Embed(title="Searching message", description=description)
+        page = menu.current_page + 1
+        description = "\n".join(f"{i}. [{item.content}]({item.url})" for i, item in enumerate(r, start=page * self.per_page))
+        embed = discord.Embed(title=f"Found ({len(self.entries):,}) matches", description=description)
+        return embed.set_author(name=f"{page}/{self.get_max_pages()} Pages")
 
 
 class PersonalCog(commands.Cog, name="Personal"):
@@ -226,7 +228,7 @@ class PersonalCog(commands.Cog, name="Personal"):
     async def edit_message(self, message: discord.Message):
         if not await self.bot.pool_pg.fetchrow("SELECT * FROM user_messages WHERE message_id=$1", message.id):
             return await self.save_message(message)
-        print("editing", message.id)
+
         executor = self.bot.pool_pg.execute
         message_query = "UPDATE user_messages SET content=$1, attachment_count=$2 WHERE message_id=$3"
         message_values = (message.content, len(message.attachments), message.id)
@@ -239,7 +241,6 @@ class PersonalCog(commands.Cog, name="Personal"):
         await executor("DELETE FROM user_embeds WHERE message_id=$1", message.id)
         for embed in message.embeds:
             await self.save_embed(message.id, embed)
-        print("done", message.id)
 
     def _parse_query(self, content):
         "is OR love AND bawls"

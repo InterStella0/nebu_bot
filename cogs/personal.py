@@ -2,15 +2,61 @@ import asyncio
 import collections
 import copy
 import io
+import itertools
 import operator
+import shlex
+import textwrap
 import traceback
-from typing import List, Union
+from typing import List, Union, Optional
 
 import discord
 from discord.ext import commands, tasks
+from discord.ext.menus import ListPageSource
 
 from data.models import NebuBot, ChannelHistoryRead, UserCount
 import utils.image_manipulation as im
+from utils.interaction import InteractionPages
+
+
+class BoolOpr:
+    value = None
+
+    def __str__(self):
+        return self.value
+
+
+class AndOpr(BoolOpr):
+    value = "AND"
+
+
+class OrOpr(BoolOpr):
+    value = "OR"
+
+
+class MessageView(ListPageSource):
+    def __init__(self, items, searches):
+        super().__init__(items, per_page=5)
+        self.searches = searches
+
+    def format_content(self, content):
+        for word in self.searches:
+            offset = len(word)
+            index = content.find(word)
+            ori = [*content]
+            ori.insert(index, '`')
+            ori.insert(index + offset + 1, '`')
+            return textwrap.shorten("".join(ori), width=20)
+
+    async def format_page(self, menu, items):
+        Value = collections.namedtuple("Value", "content url")
+        r = []
+        for item in items:
+            content = item["content"]
+            url = f'https://discord.com/channels/{menu.ctx.guild.id}/{item["channel_id"]}/{item["message_id"]}'
+            r.append(Value(self.format_content(content), url))
+
+        description = "\n".join(f"{i}. [{item.content}]({item.url})" for i, item in enumerate(r))
+        return discord.Embed(title="Searching message", description=description)
 
 
 class PersonalCog(commands.Cog, name="Personal"):
@@ -195,11 +241,78 @@ class PersonalCog(commands.Cog, name="Personal"):
             await self.save_embed(message.id, embed)
         print("done", message.id)
 
-    @commands.command()
-    async def totalmessages(self, ctx, channel: discord.TextChannel = None):
+    def _parse_query(self, column_name, content, *, argument_no=1):
+        "is OR love AND bawls"
+        _bool_opr = {"OR": OrOpr, "AND": AndOpr}
+        before_parser = []
+        last_word = False
+        for i, word in enumerate(content):
+            if word in _bool_opr:
+                if not last_word:
+                    raise commands.BadArgument(f'Invalid syntax. "{word}" must have a leading word.\n'
+                                               f'Example:`<word> {word} <word>`')
+                before_parser.append(_bool_opr[word]())
+                last_word = False
+                continue
+
+            if last_word:
+                before_parser.append(OrOpr())
+                last_word = False
+            if not last_word:
+                last_word = True
+                before_parser.append(word)
+
+        if isinstance(value := before_parser[-1], BoolOpr):
+            raise commands.BadArgument(f'Invalid syntax. "{value}" must have a second word. \n'
+                                       f'Example: `<word> {value}` <word>')
+        return self._db_parser(column_name, before_parser, argument_no=argument_no)
+
+    def _db_parser(self, column_name, raw_parsed, *, argument_no=1):
+        template = f"{column_name} LIKE ${{}}"
+        Parsed = collections.namedtuple("Parsed", "where values raw_values")
+        def parse(parsing):
+            counter = itertools.count(argument_no)
+            for arg in parsing:
+                if isinstance(arg, str):
+                    yield template.format(next(counter))
+                elif isinstance(arg, BoolOpr):
+                    yield arg.value
+
+        def get_values(parsing):
+            for arg in parsing:
+                if isinstance(arg, str):
+                    yield f"%{arg}%"
+
+        def get_raw_values(parsing):
+            for arg in parsing:
+                if isinstance(arg, str):
+                    yield arg
+
+        return Parsed(" ".join(parse(raw_parsed)), [*get_values(raw_parsed)], [*get_raw_values(raw_parsed)])
+
+    @commands.command(help="Advanced searching option to search messages based on content. \n"
+                           "Currently supported: \n"
+                           "Boolean expression\n"
+                           "String literal")
+    async def search(self, ctx, channel: Optional[discord.TextChannel], *, content):
+        channel = channel or ctx.channel
+        raw_query = shlex.split(content)
+        parsed = self._parse_query("content", raw_query, argument_no=4)
+        query = f"SELECT * FROM user_messages WHERE user_id=$1 AND channel_id=$2 AND message_id <> $3 AND (" \
+                f"{parsed.where} ) " \
+                f"ORDER BY message_id DESC"
+
+        rows = await self.bot.pool_pg.fetch(query, ctx.author.id, channel.id, ctx.message.id, *parsed.values)
+        await InteractionPages(MessageView(rows, parsed.raw_values)).start(ctx)
+
+    @commands.command(help="The total messages for a user in a specified channel. Defaults to current channel.")
+    async def totalmessages(self, ctx, channel: discord.TextChannel = commands.param(
+        converter=discord.TextChannel, default=lambda ctx: ctx.channel, displayed_default="Current Channel"
+    )):
         channel = channel or ctx.channel
         user = await self.acquire_user(ctx.author.id)
-        await ctx.send(f"Total messages in this channel for you is {user.channel_ids[channel.id]}")
+
+        await ctx.send(f"Total messages in {channel} for {ctx.author} is {user.channel_ids[channel.id]:,}")
 
     @commands.command()
     async def mostactive(self, ctx, user: Union[discord.Member, discord.User] = None):
@@ -237,4 +350,3 @@ class PersonalCog(commands.Cog, name="Personal"):
 
 async def setup(bot: NebuBot):
     await bot.add_cog(PersonalCog(bot))
-

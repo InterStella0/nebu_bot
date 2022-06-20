@@ -1,7 +1,9 @@
 import asyncio
 import collections
+import copy
 import io
 import operator
+import traceback
 from typing import List, Union
 
 import discord
@@ -17,8 +19,14 @@ class PersonalCog(commands.Cog, name="Personal"):
         self.channel_reader = {}
         self.user_counter = {}
         self.CHANNEL_LIMIT = 1000
-        if not bot.tester:
+
+    async def cog_load(self) -> None:
+        if not self.bot.tester:
             self.reader_channels.start()
+
+    async def cog_unload(self) -> None:
+        if not self.bot.tester:
+            self.reader_channels.stop()
 
     @tasks.loop(seconds=10)
     async def reader_channels(self):
@@ -43,11 +51,48 @@ class PersonalCog(commands.Cog, name="Personal"):
 
             yield channel, read_channel
 
-    async def save_read(self, channel_id: int, messages: List[discord.Message]):
-        users = collections.Counter([m.author.id for m in messages])
-        for user_id, counted in users.items():
-            user_count = await self.acquire_user(user_id)
-            await user_count.update_channel(channel_id, counter=counted)
+    async def save_read(self, messages: List[discord.Message]):
+        tasks = [asyncio.create_task(self.save_message_handler(message)) for message in messages]
+        await asyncio.gather(*tasks)
+
+    async def save_message_handler(self, message: discord.Message):
+        try:
+            await self.save_message(message)
+        except Exception:
+            traceback.print_exc()
+
+    async def delete_message(self, message_id: int):
+        message_query = "DELETE FROM user_messages WHERE message_id=$1"
+        embed_query = "SELECT * FROM user_embeds WHERE message_id=$1"
+        executor = self.bot.pool_pg.execute
+        for embed_record in await self.bot.pool_pg.fetch(embed_query, message_id):
+            embed_field_query = "DELETE FROM embed_fields WHERE embed_id=$1"
+            await executor(embed_field_query, embed_record["embed_id"])
+
+        await executor(message_query, message_id)
+        await executor("DELETE FROM user_embeds WHERE message_id=$1", message_id)
+
+    async def save_embed(self, message_id: int, embed: discord.Embed):
+        embed_query = "INSERT INTO user_embeds VALUES(DEFAULT, $1, $2, $3, $4, $5, $6, $7) RETURNING embed_id"
+        footer = embed.footer.text
+        has_thumb = bool(embed.thumbnail.url)
+        color = getattr(embed.color, "value", None)
+        author = embed.author.name
+        embed_values = (message_id, embed.title, embed.description, footer, has_thumb, color, author)
+        embed_id = await self.bot.pool_pg.fetchval(embed_query, *embed_values)
+        if not embed.fields:
+            return
+
+        fields = [(embed_id, i, field.name, field.value) for i, field in enumerate(embed.fields)]
+        field_query = "INSERT INTO embed_fields VALUES($1, $2, $3, $4)"
+        await self.bot.pool_pg.executemany(field_query, fields)
+
+    async def save_message(self, message: discord.Message):
+        message_query = "INSERT INTO user_messages VALUES($1, $2, $3, $4, $5)"
+        message_values = (message.id, message.author.id, message.channel.id, message.content, len(message.attachments))
+        await self.bot.pool_pg.execute(message_query, *message_values)
+        for embed in message.embeds:
+            await self.save_embed(message.id, embed)
 
     async def reading_session(self):
         channel_read = 0
@@ -56,7 +101,7 @@ class PersonalCog(commands.Cog, name="Personal"):
             print("Reading", channel)
             iterator = channel.history(limit=self.CHANNEL_LIMIT, before=read_channel.furthest_read)
             messages = [message async for message in iterator]
-            await self.save_read(channel.id, messages)
+            await self.save_read(messages)
             size = len(messages)
             final_message = size < self.CHANNEL_LIMIT
             last_message = messages[-1] if size else None
@@ -103,8 +148,52 @@ class PersonalCog(commands.Cog, name="Personal"):
     @commands.Cog.listener("on_message")
     async def message_counter(self, message: discord.Message):
         await self.acquire_channel(message.channel.id)
+        await self.save_message_handler(message)
         user_count = await self.acquire_user(message.author.id)
         await user_count.update_channel(message.channel.id)
+
+    @commands.Cog.listener("on_raw_message_delete")
+    async def message_raw_delete(self, payload: discord.RawMessageDeleteEvent):
+        await self.delete_message(payload.message_id)
+
+    @commands.Cog.listener("on_raw_bulk_message_delete")
+    async def message_raws_delete(self, payload: discord.RawBulkMessageDeleteEvent):
+        for message_id in payload.message_ids:
+            asyncio.create_task(self.delete_message(message_id))
+
+    @commands.Cog.listener("on_raw_message_edit")
+    async def message_raws_edit(self, payload: discord.RawMessageUpdateEvent):
+        message = payload.cached_message
+        if message:
+            message = copy.copy(message)
+            message._update(payload.data)
+        else:
+            guild = self.bot.get_guild(payload.guild_id)
+            channel = guild.get_channel(payload.channel_id)
+            try:
+                message = await channel.fetch_message(payload.message_id)
+            except discord.NotFound:
+                return
+
+        await self.edit_message(message)
+
+    async def edit_message(self, message: discord.Message):
+        if not await self.bot.pool_pg.fetchrow("SELECT * FROM user_messages WHERE message_id=$1", message.id):
+            return await self.save_message(message)
+        print("editing", message.id)
+        executor = self.bot.pool_pg.execute
+        message_query = "UPDATE user_messages SET content=$1, attachment_count=$2 WHERE message_id=$3"
+        message_values = (message.content, len(message.attachments), message.id)
+        await executor(message_query, *message_values)
+        embed_query = "SELECT * FROM user_embeds WHERE message_id=$1"
+        for embed_record in await self.bot.pool_pg.fetch(embed_query, message.id):
+            embed_field_query = "DELETE FROM embed_fields WHERE embed_id=$1"
+            await executor(embed_field_query, embed_record["embed_id"])
+
+        await executor("DELETE FROM user_embeds WHERE message_id=$1", message.id)
+        for embed in message.embeds:
+            await self.save_embed(message.id, embed)
+        print("done", message.id)
 
     @commands.command()
     async def totalmessages(self, ctx, channel: discord.TextChannel = None):

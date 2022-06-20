@@ -40,12 +40,13 @@ class MessageView(ListPageSource):
 
     def format_content(self, content):
         for word in self.searches:
-            offset = len(word)
-            index = content.find(word)
-            ori = [*content]
-            ori.insert(index, '`')
-            ori.insert(index + offset + 1, '`')
-            return textwrap.shorten("".join(ori), width=20)
+            # offset = len(word)
+            # index = content.find(word)
+            # ori = [*content]
+            # ori.insert(index, '`')
+            # ori.insert(index + offset + 1, '`') fix
+            break
+        return textwrap.shorten("".join(content), width=30, placeholder='...')
 
     async def format_page(self, menu, items):
         Value = collections.namedtuple("Value", "content url")

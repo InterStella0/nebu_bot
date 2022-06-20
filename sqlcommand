@@ -1,0 +1,24 @@
+CREATE TABLE user_messages(
+    message_id BIGINT PRIMARY KEY,
+    user_id BIGINT,
+    channel_id BIGINT,
+    content VARCHAR(4096),
+    attachment_count SMALLINT
+);
+CREATE TABLE user_embeds(
+    embed_id BIGSERIAL PRIMARY KEY,
+    message_id BIGINT,
+    title VARCHAR(256),
+    description VARCHAR(4096),
+    footer_text VARCHAR(2048),
+    has_thumbnail BOOLEAN,
+    color BIGINT,
+    author VARCHAR(256)
+);
+CREATE TABLE embed_fields(
+    embed_id BIGINT,
+    field_index SMALLINT,
+    name VARCHAR(256),
+    value VARCHAR(1024),
+    PRIMARY KEY(embed_id, field_index)
+);

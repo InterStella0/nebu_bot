@@ -305,10 +305,11 @@ class PersonalCog(commands.Cog, name="Personal"):
                 f"{parsed.where} ) " \
                 f"ORDER BY message_id DESC"
 
-        rows = await self.bot.pool_pg.fetch(query, ctx.author.id, channel.id, ctx.message.id, *parsed.values)
+        async with ctx.typing():
+            rows = await self.bot.pool_pg.fetch(query, ctx.author.id, channel.id, ctx.message.id, *parsed.values)
         if not rows:
-            value = " ".join(before_parsed)
-            raise commands.BadArgument(f"No {ctx.author} message found with '{value}' in {channel}")
+            value = ", ".join(parsed.raw_values)
+            raise commands.BadArgument(f"No {ctx.author} message found with `{value}` in {channel}")
         await InteractionPages(MessageView(rows, parsed.raw_values)).start(ctx)
 
     @commands.command(help="The total messages for a user in a specified channel. Defaults to current channel.")

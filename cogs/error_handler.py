@@ -11,6 +11,7 @@ class ErrorHandler(commands.Cog):
 
         embed = discord.Embed(title="Error occured", description=str(error))
         await ctx.send(embed=embed)
+        raise error
 
 
 async def setup(bot):

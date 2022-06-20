@@ -55,10 +55,10 @@ class MessageView(ListPageSource):
             url = f'https://discord.com/channels/{menu.ctx.guild.id}/{item["channel_id"]}/{item["message_id"]}'
             r.append(Value(self.format_content(content), url))
 
-        page = menu.current_page + 1
+        page = menu.current_page
         description = "\n".join(f"{i}. [{item.content}]({item.url})" for i, item in enumerate(r, start=page * self.per_page))
         embed = discord.Embed(title=f"Found ({len(self.entries):,}) matches", description=description)
-        return embed.set_author(name=f"{page}/{self.get_max_pages()} Pages")
+        return embed.set_author(name=f"{page + 1}/{self.get_max_pages()} Pages")
 
 
 class PersonalCog(commands.Cog, name="Personal"):

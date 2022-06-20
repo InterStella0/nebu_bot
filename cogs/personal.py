@@ -241,7 +241,7 @@ class PersonalCog(commands.Cog, name="Personal"):
             await self.save_embed(message.id, embed)
         print("done", message.id)
 
-    def _parse_query(self, column_name, content, *, argument_no=1):
+    def _parse_query(self, content):
         "is OR love AND bawls"
         _bool_opr = {"OR": OrOpr, "AND": AndOpr}
         before_parser = []
@@ -265,7 +265,7 @@ class PersonalCog(commands.Cog, name="Personal"):
         if isinstance(value := before_parser[-1], BoolOpr):
             raise commands.BadArgument(f'Invalid syntax. "{value}" must have a second word. \n'
                                        f'Example: `<word> {value}` <word>')
-        return self._db_parser(column_name, before_parser, argument_no=argument_no)
+        return before_parser
 
     def _db_parser(self, column_name, raw_parsed, *, argument_no=1):
         template = f"{column_name} LIKE ${{}}"
@@ -297,12 +297,16 @@ class PersonalCog(commands.Cog, name="Personal"):
     async def search(self, ctx, channel: Optional[discord.TextChannel], *, content):
         channel = channel or ctx.channel
         raw_query = shlex.split(content)
-        parsed = self._parse_query("content", raw_query, argument_no=4)
+        before_parsed = self._parse_query(raw_query)
+        parsed = self._db_parser("content", before_parsed, argument_no=4)
         query = f"SELECT * FROM user_messages WHERE user_id=$1 AND channel_id=$2 AND message_id <> $3 AND (" \
                 f"{parsed.where} ) " \
                 f"ORDER BY message_id DESC"
 
         rows = await self.bot.pool_pg.fetch(query, ctx.author.id, channel.id, ctx.message.id, *parsed.values)
+        if not rows:
+            value = " ".join(before_parsed)
+            raise commands.BadArgument(f"No {ctx.author} message found with '{value}' in {channel}")
         await InteractionPages(MessageView(rows, parsed.raw_values)).start(ctx)
 
     @commands.command(help="The total messages for a user in a specified channel. Defaults to current channel.")

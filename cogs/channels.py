@@ -27,7 +27,7 @@ class ChannelsCog(commands.Cog, name="Channel"):
         if not row:
             raise commands.BadArgument(f"Couldn't find a single message for {user} in {channel}")
 
-        message = ctx.channel.get_partial_message(row["message_id"])
+        message = channel.get_partial_message(row["message_id"])
         await ctx.send(message.jump_url)
 
     @commands.command(help="Find the latest message of a user that sent.")
@@ -49,7 +49,7 @@ class ChannelsCog(commands.Cog, name="Channel"):
         if not row:
             raise commands.BadArgument(f"Couldn't find a single message for {user} in {channel}")
 
-        message = ctx.channel.get_partial_message(row["message_id"])
+        message = channel.get_partial_message(row["message_id"])
         await ctx.send(message.jump_url)
 
     @commands.command(help="Get a random message for a specified user. Defaults to author.")
@@ -71,7 +71,7 @@ class ChannelsCog(commands.Cog, name="Channel"):
         if not row:
             raise commands.BadArgument(f"Couldn't find a single message for {user} in {channel}")
 
-        message = ctx.channel.get_partial_message(row["message_id"])
+        message = channel.get_partial_message(row["message_id"])
         await ctx.send(message.jump_url)
 
     @commands.command()

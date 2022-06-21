@@ -304,7 +304,6 @@ class PersonalCog(commands.Cog, name="Personal"):
                            "Boolean expression\n"
                            "String literal")
     async def search(self, ctx, channel: Optional[discord.TextChannel], *, content: str):
-
         channel = channel or ctx.channel
         raw_query = shlex.split(content)
         if any(x.strip() == "" for x in raw_query):
@@ -316,7 +315,7 @@ class PersonalCog(commands.Cog, name="Personal"):
                 f"{parsed.where} ) " \
                 f"ORDER BY message_id DESC"
 
-        async with ctx.typing():
+        async with Thinking(delete_after=True) as think:
             rows = await self.bot.pool_pg.fetch(query, ctx.author.id, channel.id, ctx.message.id, *parsed.values)
         if not rows:
             value = ", ".join(parsed.raw_values)

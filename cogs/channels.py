@@ -1,5 +1,7 @@
 import contextlib
 import io
+import random
+import textwrap
 from typing import Union, Optional
 
 import discord
@@ -23,7 +25,16 @@ class ChannelsCog(commands.Cog, name="Channel"):
                                displayed_default="Current Channel"
                            )):
         sql = "SELECT * FROM user_messages WHERE user_id=$1 AND channel_id=$2 ORDER BY message_id LIMIT 1"
-        async with Thinking(ctx.channel) as think:
+        random_messages = [
+            f"Looking through {user} information",
+            f"Reading the entire {channel} history",
+            f"Hashing {user}'s messages",
+            "Using discord's API",
+            f"Creating {user} profile."
+        ]
+        random.shuffle(random_messages)
+        thinking = f"<a:typing:597589448607399949> Reading {channel}"
+        async with Thinking(ctx.channel, thinking=thinking, random_messages=random_messages) as think:
             row = await self.bot.pool_pg.fetchrow(sql, user.id, channel.id)
             if not row:
                 raise commands.BadArgument(f"Couldn't find a single message for {user} in {channel}")
@@ -45,7 +56,25 @@ class ChannelsCog(commands.Cog, name="Channel"):
               " channel_id=$2 AND" \
               " message_id <> $3" \
               "ORDER BY message_id DESC LIMIT 1"
-        async with Thinking(ctx.channel) as think:
+        random_messages = [
+            f"Stalking every messages",
+            f"Indexing {user}'s messages",
+            f"Iterating {channel} message history",
+            f"Reading stella's database"
+        ]
+        messages = [message async for message in channel.history()]
+        message = discord.utils.find(lambda x: x.author == user and x != ctx.message, messages)
+        if message is None:
+            messages = random.choices(messages, k=5)
+            message_contents = [f"Found {m.author}: {textwrap.shorten(m.content, width=30, placeholder='...')}"
+                                for m in messages]
+            random_messages.extend(message_contents)
+        else:
+            await ctx.send(message.jump_url)
+            return
+        random.shuffle(random_messages)
+        thinking = f"<a:typing:597589448607399949> Reading {channel}"
+        async with Thinking(ctx.channel, thinking=thinking, random_messages=random_messages) as think:
             row = await self.bot.pool_pg.fetchrow(sql, user.id, channel.id, ctx.message.id)
             if not row:
                 raise commands.BadArgument(f"Couldn't find a single message for {user} in {channel}")
@@ -67,7 +96,7 @@ class ChannelsCog(commands.Cog, name="Channel"):
               " message_id <> $3 AND" \
               " random() < 0.01" \
               " ORDER BY message_id DESC LIMIT 1"
-        async with Thinking(ctx.channel) as think:
+        async with Thinking(ctx.channel, thinking=f"<a:typing:597589448607399949> Reading {channel}") as think:
             row = await self.bot.pool_pg.fetchrow(sql, user.id, channel.id, ctx.message.id)
             if not row:
                 raise commands.BadArgument(f"Couldn't find a single message for {user} in {channel}")

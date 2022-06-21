@@ -1,9 +1,9 @@
 from __future__ import annotations
 import time
-from typing import Optional, Union, Callable, TypeVar, Any, Coroutine, Awaitable, Dict
+from typing import Optional, Union, Callable, TypeVar, Any, Coroutine, Awaitable, Dict, Type, Sequence
 
 import discord
-from discord.ext import commands
+from discord.ext import commands, menus
 from discord.ui.view import _ViewCallback
 
 from utils.menus import MenuBase
@@ -242,7 +242,9 @@ class InteractionPages(CallbackView, MenuBase):
         if interaction.user != author:
             bucket = self.cooldown.get_bucket(ctx.message)
             if not bucket.update_rate_limit():
-                command = ctx.bot.get_command_signature(ctx, ctx.command)
+                help_command = ctx.bot.help_command
+                help_command.context = help_command
+                command = help_command.get_command_signature(ctx.command)
                 content = f"Only `{author}` can use this menu. If you want to use it, use `{command}`"
                 embed = discord.Embed(description=content)
                 await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -253,3 +255,20 @@ class InteractionPages(CallbackView, MenuBase):
         self.stop()
         if self.delete_after:
             await self.message.delete(delay=0)
+
+
+def pages(per_page: int = 1, show_page: bool = True):
+    """Compact ListPageSource that was originally made teru but was modified"""
+    def page_source(coro):
+        async def create_page_header(self, menu, entry: Any) -> Union[discord.Embed, str]:
+            result = await discord.utils.maybe_coroutine(coro, self, menu, entry)  # type: ignore[no-untyped-call]
+            return menu.generate_page(result, self._max_pages)
+
+        def __init__(self: menus.ListPageSource, list_pages: Sequence[Any]) -> None:
+            super(self.__class__, self).__init__(list_pages, per_page=per_page)
+        kwargs = {
+            '__init__': __init__,
+            'format_page': (coro, create_page_header)[show_page]
+        }
+        return type(coro.__name__, (menus.ListPageSource,), kwargs)
+    return page_source

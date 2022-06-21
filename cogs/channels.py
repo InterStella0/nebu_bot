@@ -1,6 +1,6 @@
 import contextlib
 import io
-from typing import Union
+from typing import Union, Optional
 
 import discord
 from discord.ext import commands
@@ -14,36 +14,52 @@ class ChannelsCog(commands.Cog, name="Channel"):
 
     @commands.command(help="Shows the first message of a user. Defaults to Author")
     @commands.guild_only()
-    async def firstmessage(self, ctx, user: discord.Member = commands.param(
-        converter=discord.Member, default=lambda ctx: ctx.author, displayed_default="Author"
-    )):
+    async def firstmessage(self, ctx,
+                           user: Union[discord.Member, discord.User] = commands.Author,
+                           channel: Union[discord.TextChannel, discord.DMChannel] = commands.param(
+                               converter=Union[discord.TextChannel, discord.DMChannel],
+                               default=lambda ctx: ctx.channel,
+                               displayed_default="Current Channel"
+                           )):
         sql = "SELECT * FROM user_messages WHERE user_id=$1 AND channel_id=$2 ORDER BY message_id LIMIT 1"
         async with ctx.typing():
-            row = await self.bot.pool_pg.fetchrow(sql, user.id, ctx.channel.id)
+            row = await self.bot.pool_pg.fetchrow(sql, user.id, channel.id)
         if not row:
-            raise commands.BadArgument(f"Couldn't find a single message for {user}")
+            raise commands.BadArgument(f"Couldn't find a single message for {user} in {channel}")
 
         message = ctx.channel.get_partial_message(row["message_id"])
         await ctx.send(message.jump_url)
 
     @commands.command(help="Find the latest message of a user that sent.")
     @commands.guild_only()
-    async def lastmessage(self, ctx, user: Union[discord.Member, discord.User] = commands.Author):
+    async def lastmessage(self, ctx,
+                          user: Union[discord.Member, discord.User] = commands.Author,
+                          channel: Union[discord.TextChannel, discord.DMChannel] = commands.param(
+                              converter=Union[discord.TextChannel, discord.DMChannel],
+                              default=lambda ctx: ctx.channel,
+                              displayed_default="Current Channel"
+                          )):
         sql = "SELECT * FROM user_messages WHERE" \
               " user_id=$1 AND" \
               " channel_id=$2 AND" \
               " message_id <> $3" \
               "ORDER BY message_id DESC LIMIT 1"
         async with ctx.typing():
-            row = await self.bot.pool_pg.fetchrow(sql, user.id, ctx.channel.id, ctx.message.id)
+            row = await self.bot.pool_pg.fetchrow(sql, user.id, channel.id, ctx.message.id)
         if not row:
-            raise commands.BadArgument(f"Couldn't find a single message for {user}")
+            raise commands.BadArgument(f"Couldn't find a single message for {user} in {channel}")
 
         message = ctx.channel.get_partial_message(row["message_id"])
         await ctx.send(message.jump_url)
 
     @commands.command(help="Get a random message for a specified user. Defaults to author.")
-    async def randommessage(self, ctx, user: Union[discord.Member, discord.User] = commands.Author):
+    async def randommessage(self, ctx,
+                            user: Union[discord.Member, discord.User] = commands.Author,
+                            channel: Union[discord.TextChannel, discord.DMChannel] = commands.param(
+                                converter=Union[discord.TextChannel, discord.DMChannel],
+                                default=lambda ctx: ctx.channel,
+                                displayed_default="Current Channel"
+                            )):
         sql = "SELECT * FROM user_messages WHERE" \
               " user_id=$1 AND" \
               " channel_id=$2 AND" \
@@ -51,9 +67,9 @@ class ChannelsCog(commands.Cog, name="Channel"):
               " random() < 0.01" \
               " ORDER BY message_id DESC LIMIT 1"
         async with ctx.typing():
-            row = await self.bot.pool_pg.fetchrow(sql, user.id, ctx.channel.id, ctx.message.id)
+            row = await self.bot.pool_pg.fetchrow(sql, user.id, channel.id, ctx.message.id)
         if not row:
-            raise commands.BadArgument(f"Couldn't find a single message for {user}")
+            raise commands.BadArgument(f"Couldn't find a single message for {user} in {channel}")
 
         message = ctx.channel.get_partial_message(row["message_id"])
         await ctx.send(message.jump_url)

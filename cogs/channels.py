@@ -6,6 +6,7 @@ import discord
 from discord.ext import commands
 
 import utils.image_manipulation as im
+from utils.useful import Thinking
 
 
 class ChannelsCog(commands.Cog, name="Channel"):
@@ -22,13 +23,13 @@ class ChannelsCog(commands.Cog, name="Channel"):
                                displayed_default="Current Channel"
                            )):
         sql = "SELECT * FROM user_messages WHERE user_id=$1 AND channel_id=$2 ORDER BY message_id LIMIT 1"
-        async with ctx.typing():
+        async with Thinking(ctx.channel) as think:
             row = await self.bot.pool_pg.fetchrow(sql, user.id, channel.id)
-        if not row:
-            raise commands.BadArgument(f"Couldn't find a single message for {user} in {channel}")
+            if not row:
+                raise commands.BadArgument(f"Couldn't find a single message for {user} in {channel}")
 
-        message = channel.get_partial_message(row["message_id"])
-        await ctx.send(message.jump_url)
+            message = channel.get_partial_message(row["message_id"])
+            think.set(content=message.jump_url)
 
     @commands.command(help="Find the latest message of a user that sent.")
     @commands.guild_only()
@@ -44,13 +45,13 @@ class ChannelsCog(commands.Cog, name="Channel"):
               " channel_id=$2 AND" \
               " message_id <> $3" \
               "ORDER BY message_id DESC LIMIT 1"
-        async with ctx.typing():
+        async with Thinking(ctx.channel) as think:
             row = await self.bot.pool_pg.fetchrow(sql, user.id, channel.id, ctx.message.id)
-        if not row:
-            raise commands.BadArgument(f"Couldn't find a single message for {user} in {channel}")
+            if not row:
+                raise commands.BadArgument(f"Couldn't find a single message for {user} in {channel}")
 
-        message = channel.get_partial_message(row["message_id"])
-        await ctx.send(message.jump_url)
+            message = channel.get_partial_message(row["message_id"])
+            think.set(content=message.jump_url)
 
     @commands.command(help="Get a random message for a specified user. Defaults to author.")
     async def randommessage(self, ctx,
@@ -66,13 +67,13 @@ class ChannelsCog(commands.Cog, name="Channel"):
               " message_id <> $3 AND" \
               " random() < 0.01" \
               " ORDER BY message_id DESC LIMIT 1"
-        async with ctx.typing():
+        async with Thinking(ctx.channel) as think:
             row = await self.bot.pool_pg.fetchrow(sql, user.id, channel.id, ctx.message.id)
-        if not row:
-            raise commands.BadArgument(f"Couldn't find a single message for {user} in {channel}")
+            if not row:
+                raise commands.BadArgument(f"Couldn't find a single message for {user} in {channel}")
 
-        message = channel.get_partial_message(row["message_id"])
-        await ctx.send(message.jump_url)
+            message = channel.get_partial_message(row["message_id"])
+            think.set(content=message.jump_url)
 
     @commands.command()
     @commands.guild_only()

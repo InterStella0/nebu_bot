@@ -17,6 +17,7 @@ from discord.ext.menus import ListPageSource
 from data.models import NebuBot, ChannelHistoryRead, UserCount
 import utils.image_manipulation as im
 from utils.interaction import InteractionPages
+from utils.useful import Thinking
 
 
 class BoolOpr:
@@ -328,9 +329,9 @@ class PersonalCog(commands.Cog, name="Personal"):
     )):
         sql = "SELECT COUNT(*) FROM user_messages" \
               " WHERE channel_id=$1 AND user_id=$2"
-        async with ctx.typing():
+        async with Thinking(ctx.channel) as think:
             counted = await self.bot.pool_pg.fetchval(sql, channel.id, ctx.author.id)
-        await ctx.send(f"Total messages in `{channel}` for **{ctx.author}** is `{counted:,}`")
+            think.set(content=f"Total messages in `{channel}` for **{ctx.author}** is `{counted:,}`")
 
     @commands.command(help="The total messages for a user in a day in a specified channel. Defaults to current channel.")
     async def totalmessagestoday(self, ctx, channel: discord.TextChannel = commands.param(
@@ -339,8 +340,9 @@ class PersonalCog(commands.Cog, name="Personal"):
         sql = "SELECT COUNT(*) FROM user_messages WHERE channel_id=$1 AND user_id=$2 AND message_id > $3"
         yesterday = discord.utils.utcnow() - datetime.timedelta(days=1)
         last_id = discord.utils.time_snowflake(yesterday)
-        counted = await self.bot.pool_pg.fetchval(sql, channel.id, ctx.author.id, last_id)
-        await ctx.send(f"Total messages today in `{channel}` for **{ctx.author}** is `{counted:,}`")
+        async with Thinking(ctx.channel) as think:
+            counted = await self.bot.pool_pg.fetchval(sql, channel.id, ctx.author.id, last_id)
+            think.set(content=f"Total messages today in `{channel}` for **{ctx.author}** is `{counted:,}`")
 
     @commands.command(help="Shows a graph of how active you are in the server.")
     async def mostactive(self, ctx, user: Union[discord.Member, discord.User] = None):

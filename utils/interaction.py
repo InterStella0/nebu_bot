@@ -243,7 +243,7 @@ class InteractionPages(CallbackView, MenuBase):
             bucket = self.cooldown.get_bucket(ctx.message)
             if not bucket.update_rate_limit():
                 help_command = ctx.bot.help_command
-                help_command.context = help_command
+                help_command.context = ctx
                 command = help_command.get_command_signature(ctx.command)
                 content = f"Only `{author}` can use this menu. If you want to use it, use `{command}`"
                 embed = discord.Embed(description=content)

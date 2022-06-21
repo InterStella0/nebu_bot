@@ -26,7 +26,7 @@ class ChannelsCog(commands.Cog, name="Channel"):
         message = ctx.channel.get_partial_message(row["message_id"])
         await ctx.send(message.jump_url)
 
-    @commands.command(help="Find the latest message of a user that sent")
+    @commands.command(help="Find the latest message of a user that sent.")
     @commands.guild_only()
     async def lastmessage(self, ctx, user: Union[discord.Member, discord.User] = commands.Author):
         sql = "SELECT * FROM user_messages WHERE" \
@@ -42,6 +42,21 @@ class ChannelsCog(commands.Cog, name="Channel"):
         message = ctx.channel.get_partial_message(row["message_id"])
         await ctx.send(message.jump_url)
 
+    @commands.command(help="Get a random message for a specified user. Defaults to author.")
+    async def randommessage(self, ctx, user: Union[discord.Member, discord.User] = commands.Author):
+        sql = "SELECT * FROM user_messages WHERE" \
+              " user_id=$1 AND" \
+              " channel_id=$2 AND" \
+              " message_id <> $3 AND" \
+              " random() < 0.01" \
+              " ORDER BY message_id DESC LIMIT 1"
+        async with ctx.typing():
+            row = await self.bot.pool_pg.fetchrow(sql, user.id, ctx.channel.id, ctx.message.id)
+        if not row:
+            raise commands.BadArgument(f"Couldn't find a single message for {user}")
+
+        message = ctx.channel.get_partial_message(row["message_id"])
+        await ctx.send(message.jump_url)
 
     @commands.command()
     @commands.guild_only()

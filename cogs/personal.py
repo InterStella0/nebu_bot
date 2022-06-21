@@ -315,6 +315,19 @@ class PersonalCog(commands.Cog, name="Personal"):
             raise commands.BadArgument(f"No {ctx.author} message found with `{value}` in {channel}")
         await InteractionPages(MessageView(rows, parsed.raw_values)).start(ctx)
 
+    @commands.command(help="Shows the first message of a user. Defaults to Author")
+    async def firstmessage(self, ctx, user: discord.Member = commands.param(
+        converter=discord.Member, default=lambda ctx: ctx.author, displayed_default="Author"
+    )):
+        sql = "SELECT * FROM user_messages WHERE user_id=$1 AND channel_id=$2 ORDER BY message_id LIMIT 1"
+        async with ctx.typing():
+            row = await self.bot.pool_pg.fetchrow(sql, user.id, ctx.channel.id)
+        if not row:
+            raise commands.BadArgument(f"Couldn't find a single message for {user}")
+
+        message = ctx.channel.get_partial_message(row["message_id"])
+        await ctx.send(message.jump_url)
+
     @commands.command(help="The total messages for a user in a specified channel. Defaults to current channel.")
     async def totalmessages(self, ctx, channel: discord.TextChannel = commands.param(
         converter=discord.TextChannel, default=lambda ctx: ctx.channel, displayed_default="Current Channel"

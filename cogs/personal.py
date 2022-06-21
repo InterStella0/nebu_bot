@@ -50,20 +50,25 @@ class MessageView(ListPageSource):
         return textwrap.shorten("".join(content), width=30, placeholder='...')
 
     async def format_page(self, menu, items):
-        Value = collections.namedtuple("Value", "content url")
+        Value = collections.namedtuple("Value", "content url created_at")
         r = []
+        channel = None
         for item in items:
             content = item["content"]
-            url = f'https://discord.com/channels/{menu.ctx.guild.id}/{item["channel_id"]}/{item["message_id"]}'
-            r.append(Value(self.format_content(content), url))
+            channel = channel or menu.ctx.bot.get_channel(item["channel_id"])
+            message = channel.get_partial_message(item["message_id"])
+            created_at = discord.utils.format_dt(message.created_at)
+            r.append(Value(self.format_content(content), message.jump_url, created_at))
 
         page = menu.current_page
-        description = "\n".join(f"{i}. [{item.content}]({item.url})" for i, item in enumerate(r, start=page * self.per_page))
+        description = "\n".join([f"{i}. [[{item.content}]({item.url})][{item.created_at}]"
+                                 for i, item in enumerate(r, start=page * self.per_page + 1)])
         embed = discord.Embed(title=f"Found ({len(self.entries):,}) matches", description=description)
         return embed.set_author(name=f"{page + 1}/{self.get_max_pages()} Pages")
 
 
 class PersonalCog(commands.Cog, name="Personal"):
+    """A category of commands related to you. Every commands in here are only for you."""
     def __init__(self, bot: NebuBot):
         self.bot = bot
         self.channel_reader = {}
@@ -293,6 +298,7 @@ class PersonalCog(commands.Cog, name="Personal"):
         return Parsed(" ".join(parse(raw_parsed)), [*get_values(raw_parsed)], [*get_raw_values(raw_parsed)])
 
     @commands.command(help="Advanced searching option to search messages based on content. \n"
+                           "This command will only search messages that was written by you. Not anyone else.\n"
                            "Currently supported: \n"
                            "Boolean expression\n"
                            "String literal")

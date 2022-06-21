@@ -244,7 +244,6 @@ class PersonalCog(commands.Cog, name="Personal"):
             await self.save_embed(message.id, embed)
 
     def _parse_query(self, content):
-        "is OR love AND bawls"
         _bool_opr = {"OR": OrOpr, "AND": AndOpr}
         before_parser = []
         last_word = False
@@ -296,9 +295,13 @@ class PersonalCog(commands.Cog, name="Personal"):
                            "Currently supported: \n"
                            "Boolean expression\n"
                            "String literal")
-    async def search(self, ctx, channel: Optional[discord.TextChannel], *, content):
+    async def search(self, ctx, channel: Optional[discord.TextChannel], *, content: str):
+
         channel = channel or ctx.channel
         raw_query = shlex.split(content)
+        if any(x.strip() == "" for x in raw_query):
+            raise commands.BadArgument("Empty query is not allowed.")
+
         before_parsed = self._parse_query(raw_query)
         parsed = self._db_parser("content", before_parsed, argument_no=4)
         query = f"SELECT * FROM user_messages WHERE user_id=$1 AND channel_id=$2 AND message_id <> $3 AND (" \

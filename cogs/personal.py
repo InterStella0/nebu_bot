@@ -320,10 +320,11 @@ class PersonalCog(commands.Cog, name="Personal"):
     async def totalmessages(self, ctx, channel: discord.TextChannel = commands.param(
         converter=discord.TextChannel, default=lambda ctx: ctx.channel, displayed_default="Current Channel"
     )):
-        channel = channel or ctx.channel
-        user = await self.acquire_user(ctx.author.id)
-
-        await ctx.send(f"Total messages in {channel} for {ctx.author} is {user.channel_ids[channel.id]:,}")
+        sql = "SELECT COUNT(*) FROM user_messages" \
+              " WHERE channel_id=$1 AND user_id=$2"
+        async with ctx.typing():
+            counted = await self.bot.pool_pg.fetchval(sql, channel.id, ctx.author.id)
+        await ctx.send(f"Total messages in `{channel}` for **{ctx.author}** is `{counted:,}`")
 
     @commands.command(help="The total messages for a user in a day in a specified channel. Defaults to current channel.")
     async def totalmessagestoday(self, ctx, channel: discord.TextChannel = commands.param(

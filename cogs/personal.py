@@ -315,7 +315,7 @@ class PersonalCog(commands.Cog, name="Personal"):
                 f"{parsed.where} ) " \
                 f"ORDER BY message_id DESC"
 
-        async with Thinking(delete_after=True) as think:
+        async with Thinking(ctx.channel, delete_after=True) as think:
             rows = await self.bot.pool_pg.fetch(query, ctx.author.id, channel.id, ctx.message.id, *parsed.values)
         if not rows:
             value = ", ".join(parsed.raw_values)
